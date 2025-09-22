@@ -1,0 +1,10 @@
+requests
+psycopg2-binary
+pandas
+gspread
+oauth2client
+google-api-python-client
+streamlit
+plotly
+google-auth-oauthlib
+google-cloud-storage
