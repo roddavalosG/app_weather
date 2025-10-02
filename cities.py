@@ -7,6 +7,7 @@ cities = {
     "San Juan del Rio": (20.3875, -99.9962, "America/Mexico_City"),  # MX
     "San Luis Potosi": (22.1498, -100.9792, "America/Mexico_City"),  # MX
     "Durango": (24.0277, -104.6532, "America/Mexico_City"),  # MX
+    "Córdoba": (18.8941, -96.9347, "America/Mexico_City"),
     "Irapuato": (20.6773, -101.3551, "America/Mexico_City"),  # MX
 
     # 🦸 Heros (Mexico)
@@ -78,6 +79,7 @@ cities = {
     "San Juan del Rio": (20.3875, -99.9962, "America/Mexico_City"),  # MX
     "San Luis Potosi": (22.1498, -100.9792, "America/Mexico_City"),  # MX
     "Durango": (24.0277, -104.6532, "America/Mexico_City"),  # MX
+    "Córdoba": (18.8941, -96.9347, "America/Mexico_City"),
     "Irapuato": (20.6773, -101.3551, "America/Mexico_City"),  # MX
 
     # 🦸 Heros (Mexico)
