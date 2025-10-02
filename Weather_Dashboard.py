@@ -46,9 +46,10 @@ def load_all_data():
         data_dict['daily'] = daily_df
         
         hourly_df = data_dict['hourly']
-        hourly_df["forecast_time"] = pd.to_datetime(hourly_df["forecast_time"]).dt.tz_localize('UTC').dt.tz_convert('America/Mexico_City')
-        numeric_cols_hourly = ["temp", "feels_like", "humidity", "rain_probability", "rain_1h", "wind_speed"]
-        for col in numeric_cols_hourly: hourly_df[col] = pd.to_numeric(hourly_df[col], errors='coerce')
+        if not hourly_df.empty:
+            hourly_df["forecast_time"] = pd.to_datetime(hourly_df["forecast_time"]).dt.tz_localize('UTC').dt.tz_convert('America/Mexico_City')
+            numeric_cols_hourly = ["temp", "feels_like", "humidity", "rain_probability", "rain_1h", "wind_speed"]
+            for col in numeric_cols_hourly: hourly_df[col] = pd.to_numeric(hourly_df[col], errors='coerce')
         data_dict['hourly'] = hourly_df
         
         alerts_df = data_dict['alerts']
@@ -96,7 +97,9 @@ if st.session_state.page == 'General Dashboard' and all_data:
         filter_cols = st.columns(4)
         with filter_cols[0]: selected_date_main = st.date_input("📅 Date", datetime.today().date())
         with filter_cols[1]:
-            countries = ["All"] + sorted(daily_df_merged['country_code'].unique().tolist())
+            # --- LÍNEA CORREGIDA ---
+            valid_countries = [code for code in daily_df_merged['country_code'].unique() if pd.notna(code)]
+            countries = ["All"] + sorted(valid_countries)
             selected_country = st.selectbox("🌎 Country", countries)
         with filter_cols[2]:
             teams = ["All"] + sorted(daily_df_merged['team'].dropna().unique().tolist())
@@ -124,8 +127,12 @@ if st.session_state.page == 'General Dashboard' and all_data:
                     main_cond = str(row.main_condition).lower().strip()
                     weather_cond = str(row.weather_condition).lower().strip()
                     weather_icon = weather_icons.get(weather_cond, weather_icons.get(main_cond, "🌎"))
-                    active_alert = alerts_df[(alerts_df['city'] == row.city) & (alerts_df['start_time'].dt.date <= selected_date_main) & (alerts_df['end_time'].dt.date >= selected_date_main)]
-                    alert_icon = " 🚨" if not active_alert.empty else ""
+                    if not alerts_df.empty:
+                        active_alert = alerts_df[(alerts_df['city'] == row.city) & (alerts_df['start_time'].dt.date <= selected_date_main) & (alerts_df['end_time'].dt.date >= selected_date_main)]
+                        alert_icon = " 🚨" if not active_alert.empty else ""
+                    else:
+                        active_alert = pd.DataFrame()
+                        alert_icon = ""
 
                     st.markdown(f"<h6>{weather_icon} {row.city}{alert_icon}</h6>", unsafe_allow_html=True)
                     st.markdown(f"""
@@ -158,15 +165,16 @@ elif st.session_state.page == 'Detailed Analysis' and all_data:
         with title_cols[1]:
             selected_date_detail = st.date_input("Select Date", datetime.today().date(), label_visibility="collapsed")
 
-        alerts_df = all_data['alerts']
-        city_active_alerts = alerts_df[(alerts_df['city'] == selected_city) & (alerts_df['start_time'].dt.date <= selected_date_detail) & (alerts_df['end_time'].dt.date >= selected_date_detail)]
-        if not city_active_alerts.empty:
-            st.subheader("🚨 Active Alert(s) for this Day")
-            for _, alert in city_active_alerts.iterrows():
-                st.warning(f"**{alert['event']}** (Source: {alert['sender_name']})\n\n"
-                           f"**Description:** {alert['description']}\n\n"
-                           f"**Active from:** {alert['start_time'].strftime('%Y-%m-%d')} **to** {alert['end_time'].strftime('%Y-%m-%d')}")
-            st.markdown("---")
+        if not all_data['alerts'].empty:
+            alerts_df = all_data['alerts']
+            city_active_alerts = alerts_df[(alerts_df['city'] == selected_city) & (alerts_df['start_time'].dt.date <= selected_date_detail) & (alerts_df['end_time'].dt.date >= selected_date_detail)]
+            if not city_active_alerts.empty:
+                st.subheader("🚨 Active Alert(s) for this Day")
+                for _, alert in city_active_alerts.iterrows():
+                    st.warning(f"**{alert['event']}** (Source: {alert['sender_name']})\n\n"
+                               f"**Description:** {alert['description']}\n\n"
+                               f"**Active from:** {alert['start_time'].strftime('%Y-%m-%d')} **to** {alert['end_time'].strftime('%Y-%m-%d')}")
+                st.markdown("---")
         
         city_daily_df = all_data['daily'][all_data['daily']['city'] == selected_city]
         
@@ -190,25 +198,23 @@ elif st.session_state.page == 'Detailed Analysis' and all_data:
             st.warning("No summary data available from the selected date.")
         st.markdown("---") 
 
-        # ⭐ CAMBIO FINAL: Lógica del gráfico por hora
         st.subheader(f"🕒 Hourly Breakdown for {selected_date_detail.strftime('%b %d, %Y')}")
-        city_hourly_df = all_data['hourly'][all_data['hourly']['city'] == selected_city]
-        
-        # Filtra los datos por hora para el día completo seleccionado
-        start_of_day = pd.Timestamp(selected_date_detail, tz='America/Mexico_City')
-        end_of_day = start_of_day + timedelta(days=1)
-        hourly_data_for_day = city_hourly_df[(city_hourly_df['forecast_time'] >= start_of_day) & (city_hourly_df['forecast_time'] < end_of_day)]
-        
-        if not hourly_data_for_day.empty:
-            rain_text_labels = hourly_data_for_day['rain_1h'].apply(lambda x: f'{x:.1f} mm' if x > 0 else '')
-            fig_hourly = go.Figure()
-            fig_hourly.add_trace(go.Scatter(x=hourly_data_for_day['forecast_time'], y=hourly_data_for_day['temp'], mode='lines+markers', name='Temperature (°C)', yaxis='y1', line=dict(color='orange')))
-            fig_hourly.add_trace(go.Bar(x=hourly_data_for_day['forecast_time'], y=hourly_data_for_day['rain_probability'], name='Rain Probability (%)', yaxis='y2', marker_color='blue', opacity=0.6, text=rain_text_labels, textposition='outside'))
-            fig_hourly.update_layout(title_text="Hourly Temperature & Rain Probability", yaxis=dict(title="Temperature (°C)", color='orange'), yaxis2=dict(title="Rain Probability (%)", overlaying='y', side='right', range=[0, 100], color='blue'), legend=dict(x=0, y=1.2, orientation="h"))
-            fig_hourly.update_xaxes(title_text="Time (America/Mexico_City)")
-            st.plotly_chart(fig_hourly, use_container_width=True)
-        else:
-            st.info("No hourly data is available for the selected date.")
+        if not all_data['hourly'].empty:
+            city_hourly_df = all_data['hourly'][all_data['hourly']['city'] == selected_city]
+            start_of_day = pd.Timestamp(selected_date_detail, tz='America/Mexico_City')
+            end_of_day = start_of_day + timedelta(days=1)
+            hourly_data_for_day = city_hourly_df[(city_hourly_df['forecast_time'] >= start_of_day) & (city_hourly_df['forecast_time'] < end_of_day)]
+            
+            if not hourly_data_for_day.empty:
+                rain_text_labels = hourly_data_for_day['rain_1h'].apply(lambda x: f'{x:.1f} mm' if x > 0 else '')
+                fig_hourly = go.Figure()
+                fig_hourly.add_trace(go.Scatter(x=hourly_data_for_day['forecast_time'], y=hourly_data_for_day['temp'], mode='lines+markers', name='Temperature (°C)', yaxis='y1', line=dict(color='orange')))
+                fig_hourly.add_trace(go.Bar(x=hourly_data_for_day['forecast_time'], y=hourly_data_for_day['rain_probability'], name='Rain Probability (%)', yaxis='y2', marker_color='blue', opacity=0.6, text=rain_text_labels, textposition='outside'))
+                fig_hourly.update_layout(title_text="Hourly Temperature & Rain Probability", yaxis=dict(title="Temperature (°C)", color='orange'), yaxis2=dict(title="Rain Probability (%)", overlaying='y', side='right', range=[0, 100], color='blue'), legend=dict(x=0, y=1.2, orientation="h"))
+                fig_hourly.update_xaxes(title_text="Time (America/Mexico_City)")
+                st.plotly_chart(fig_hourly, use_container_width=True)
+            else:
+                st.info("No hourly data is available for the selected date.")
 
         st.subheader(f"📈 8-Day Trend: Temperature & UV Index")
         future_forecast_trend = city_daily_df[city_daily_df['date'] >= selected_date_detail].head(8)
