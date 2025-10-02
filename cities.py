@@ -68,11 +68,4 @@ cities = {
     "Guayaquil": (-2.1894, -79.8891, "America/Guayaquil"),  # EC
     "Ciudad Obregon": (27.4864, -109.9408, "America/Hermosillo"),  # MX
     "Colima": (19.2433, -103.7250, "America/Mexico_City"),  # MX
-
-
-    "Mexico City": (19.4326, -99.1332, "America/Mexico_City"),  # MX
-    "Guadalajara": (20.6597, -103.3496, "America/Mexico_City"),  # MX
-    "Monterrey": (25.6866, -100.3161, "America/Monterrey")  # MX
 }
-
-
